@@ -1,72 +1,110 @@
 === Konto Checkout for WooCommerce ===
 Contributors: kontoreikningar
-Tags: invoices, eBank, gateway, checkout, inventory
+Tags: invoice, iceland, e-invoice, inventory, payment gateway
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 2.1.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
-Repo: https://github.com/KontoIS/KontoforWooCommerce
+Repo: https://github.com/Konto-ehf/KontoforWooCommerce
 Requires Plugins: woocommerce
 
-Konto e-invoices and bank claims for WooCommerce orders in Iceland, with stock synced from Konto inventory (lots).
+Icelandic e-invoices, online-bank claims and stock sync for WooCommerce. Konto invoices your orders and keeps your stock in step.
 
 == Description ==
 
-**Pay with Konto.** At checkout the customer chooses Konto, enters their kennitala and gets an electronic invoice (PDF, or XML for companies) by email. A payment claim appears in their online bank under "Ógreiddir reikningar".
+Sell the way Iceland pays. Konto Checkout connects your WooCommerce store to [Konto](https://konto.is), the Icelandic e-invoicing platform. Your customers can pay by invoice in their online bank, every order can get a proper Icelandic invoice, and your stock follows what you actually have on the shelf.
 
-**Invoices for every order.** Orders paid by card or another method can be sent to Konto as a paid invoice, with one click in the order list or automatically when the order is Processing. If the buyer gave no kennitala, the invoice is a cash sale (Staðgreitt) on the shop's own kennitala.
+= Pay with Konto =
 
-**Stock from Konto inventory.** With the Konto Inventory add-on, WooCommerce stock follows the lots you manage in Konto:
+Customers choose "Reikningur í netbanka" at checkout and enter their kennitala. Konto issues the invoice, emails the PDF (or sends an XML e-invoice to companies) and creates a claim that shows up in the customer's online bank under "Ógreiddir reikningar". The kennitala is checked before the order goes through.
+
+= An invoice for every order =
+
+Orders paid by card or any other method can go to Konto too: one click in the order list, or automatically when the order is Processing. No kennitala? The invoice becomes a cash sale (Staðgreitt) on your own kennitala, and the customer still gets the receipt by email.
+
+= Stock that matches Konto =
+
+With the Konto Inventory add-on, Konto is where you manage stock and lots, and WooCommerce follows:
 
 * Products are matched on SKU = Konto item number.
-* Every 15 minutes (or on "Sync stock now"), WooCommerce stock is set to the sellable Konto stock (unexpired lots), minus units in orders that are not yet invoiced in Konto.
-* When an order is invoiced, Konto draws the stock down from the lots that expire first, and the order note lists the lots used.
-* Products without a SKU, or without lots in Konto, are left alone.
+* Stock updates every 15 minutes, or right away with "Sync stock now".
+* Orders that are not invoiced yet are held back, so you never sell the same item twice.
+* Invoices draw stock from the lots that expire first. The order note shows which lots were used.
 
-**Refunds become credit notes.** A refund in WooCommerce creates a Konto credit note on the original invoice:
+= Refunds become credit notes =
 
-* A full refund credits the whole invoice and cancels an unpaid bank claim.
-* A partial refund credits the refunded items, shipping and fees, or spreads a refunded amount over the order's VAT rates.
-* Items you restock in WooCommerce go back into the Konto lots the invoice drew from. Items you don't restock leave Konto stock unchanged.
+Refund an order in WooCommerce and Konto creates the credit note. A full refund closes the invoice and cancels an unpaid bank claim. Items you restock go straight back into the Konto lots they came from.
 
-VAT is taken from each order line (24%, 11% or 0%). Shipping and fees are invoiced as separate lines with their own VAT.
+= Built for Icelandic VAT =
 
-Works with the block checkout and the classic checkout, and with WooCommerce's High-Performance Order Storage.
+VAT is read from each order line: 24%, 11% or 0%. Shipping and fees keep their own VAT, and a rounding line takes care of the last króna.
 
-Note: Konto users need an API key. **IS: Áskrifendur á konto.is geta virkjað vefþjónustutengingu og fengið úthlutað API lykil sem þarf til að tengja vefverslunina við Konto.**
+= Works with your store as it is =
+
+* Block checkout and classic checkout.
+* WooCommerce High-Performance Order Storage (HPOS).
+* Test mode for trying things out before going live.
+
+= What you need =
+
+* A Konto subscription with API access (Vefþjónustuaðgangur), which gives you a username and an API key.
+* For stock sync: the Konto Inventory add-on.
+
+= Á íslensku =
+
+Konto Checkout tengir WooCommerce-vefverslunina þína við Konto. Viðskiptavinir geta greitt með rafrænum reikningi og kröfu í netbanka. Pantanir fá rafrænan reikning úr Konto og lagerstaða verslunarinnar fylgir lagerstöðu í Konto, svo þú seljir aldrei það sem ekki er til. Endurgreiðslur verða sjálfkrafa að kreditreikningum.
+
+Áskrifendur á konto.is virkja vefþjónustuaðgang og sækja API-lykil undir Áskriftir og viðbætur.
 
 == Installation ==
 
-1. Install the plugin from the Plugins screen in WordPress, or upload the files to `/wp-content/plugins/woo-konto-checkout`.
-2. Activate it.
-3. Go to WooCommerce > Settings > Payments > Konto. Enter the username and API key from Konto (Vefþjónustuaðgangur under Áskriftir og viðbætur) and save. The settings page confirms the connection and shows the connected account.
-4. Optional: turn on "Stock sync" and make sure each product's SKU equals its Konto item number.
+1. Install "Konto Checkout for WooCommerce" from Plugins > Add New, and activate it.
+2. Go to WooCommerce > Settings > Payments > Konto.
+3. Enter your Konto username and API key (Vefþjónustuaðgangur under Áskriftir og viðbætur on konto.is) and save. The page confirms the connection and shows your Konto account.
+4. Optional: turn on "Stock sync", and give each product the same SKU as its item number in Konto.
+5. Optional: turn on automatic invoices for orders paid by other methods.
 
 == Frequently Asked Questions ==
 
-= When is a kennitala required? =
-Only when the customer pays with Konto, because the claim is created on their kennitala. For other payment methods it is optional. A kennitala that is entered is checked (check digit).
+= Do customers need a kennitala? =
+
+Only when they pay with Konto, because the bank claim is created on their kennitala. With other payment methods it is optional. Any kennitala that is entered is checked.
 
 = What happens when there is no kennitala? =
-The invoice is a cash sale: the bill-to name is "Staðgreitt" and the bill-to kennitala is the shop's own. The customer still gets the invoice by email.
+
+The invoice is a cash sale: billed to "Staðgreitt" on your own kennitala. The customer still gets the invoice by email.
+
+= Can I use Konto next to card payments? =
+
+Yes. Konto is one payment method among the others, and orders paid by card can still be invoiced in Konto, by hand or automatically.
 
 = Which stock figure wins, WooCommerce or Konto? =
-Konto. Change stock in Konto (add or remove lots), not in WooCommerce. The next sync overwrites WooCommerce.
 
-= What happens with a partial refund of an unpaid bank claim? =
-No credit note is created, because a credit note cannot shrink a claim that is still open. The order note says so: adjust or cancel the claim in Konto. Once the invoice is paid, "Konto: create credit notes for refunds" on the order screen creates the missing credit notes.
+Konto. Add or remove stock in Konto (as lots), not in WooCommerce. The next sync overwrites the WooCommerce number.
 
-= Does the plugin support test mode? =
-Yes. Test mode sends requests to the test server URL in the advanced settings.
+= What about a partial refund of an unpaid bank claim? =
+
+A credit note can't shrink a claim that is still open, so the plugin doesn't create one. The order note tells you to adjust or cancel the claim in Konto. Once the invoice is paid, "Konto: create credit notes for refunds" on the order screen creates the missing credit notes.
+
+= Which VAT rates are supported? =
+
+24%, 11% and 0%, the rates Konto invoices with. An order line with any other rate stops with a clear message instead of creating a wrong invoice.
+
+= Is there a test mode? =
+
+Yes. Test mode sends requests to the test server set under Advanced in the plugin settings.
 
 == Screenshots ==
 
-1. The checkout screen where the customer can choose an e-invoice and pay in their online bank
-2. The plugin settings under WooCommerce > Settings > Payments
-3. The message the customer sees when they choose Konto
-4. Creating Konto invoices for orders paid by other methods
+1. Checkout: the customer picks "Reikningur í netbanka" and enters a kennitala.
+2. The order: the Konto invoice number on the order, and the stock lots it used in the order notes.
+3. Settings: connect your Konto account and choose how invoices are made.
+4. Stock sync: WooCommerce stock follows Konto, with a status report and "Sync stock now".
+5. Products: stock levels kept in step with Konto inventory.
+6. Refunds: a WooCommerce refund becomes a Konto credit note, with restocked items back in their lots.
+7. Orders paid by other methods: send them to Konto as an invoice or a draft with one click.
 
 == Changelog ==
 
@@ -77,6 +115,7 @@ Yes. Test mode sends requests to the test server URL in the advanced settings.
 * New: High-Performance Order Storage (HPOS) support.
 * New: refunds create Konto credit notes (full or partial), and restocked items go back into their Konto lots.
 * New: "Konto: create credit notes for refunds" on the order screen, for refunds without a credit note.
+* New: the Konto invoice and credit note numbers are shown on the order screen and in order notes.
 * New: optional automatic invoices for orders paid by other methods.
 * New: "Konto: issue invoice" and "Konto: save as draft" on the order screen.
 * New: due days, final due days and invoice language settings.

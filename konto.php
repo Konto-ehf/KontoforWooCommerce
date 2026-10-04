@@ -9,7 +9,7 @@
   Author URI: https://konto.is/
   License: GPLv3
   License URI: http://www.gnu.org/licenses/gpl-3.0.html
-  Repo: https://github.com/KontoIS/KontoforWooCommerce
+  Repo: https://github.com/Konto-ehf/KontoforWooCommerce
   Requires at least: 6.0
   Requires PHP: 7.4
   Requires Plugins: woocommerce
@@ -165,6 +165,7 @@ function konto_gateway_init() {
 	add_action( 'admin_post_konto_create_invoice', 'konto_admin_post_create_invoice' );
 	add_action( 'admin_post_konto_sync_now', 'konto_admin_post_sync_now' );
 	add_action( 'admin_head', 'konto_admin_head' );
+	add_action( 'woocommerce_admin_order_data_after_order_details', 'konto_admin_order_panel' );
 
 	// Automatic invoices for orders paid with another method.
 	add_action( 'woocommerce_order_status_processing', 'konto_maybe_auto_invoice', 20, 1 );
@@ -803,6 +804,15 @@ function konto_build_invoice_data( $order, $args ) {
 	return apply_filters( 'konto_invoice_data', $data, $order, $args );
 }
 
+/** Konto's own invoice number (e.g. "KAF-1042") for a guid; '' when it can't be read. */
+function konto_invoice_number( $gateway, $guid ) {
+	if ( ! $gateway || ! $guid || 'created' === $guid ) {
+		return '';
+	}
+	$result = $gateway->api()->call( 'get-invoice', array( 'guid' => $guid ) );
+	return ( ! is_wp_error( $result ) && ! empty( $result['result']['number'] ) ) ? (string) $result['result']['number'] : '';
+}
+
 /**
  * Creates the Konto invoice for an order once (guarded by the konto_invoice meta).
  *
@@ -849,8 +859,12 @@ function konto_create_invoice_for_order( $order, $args = array() ) {
 	}
 
 	$kind = ! empty( $args['draft'] ) ? __( 'saved as draft', 'woo-konto-checkout' ) : ( ! empty( $args['claim'] ) ? __( 'issued with a bank claim', 'woo-konto-checkout' ) : __( 'issued as paid', 'woo-konto-checkout' ) );
-	/* translators: 1: how the invoice was created (e.g. "issued as paid"), 2: Konto invoice id. */
-	$note = sprintf( __( 'Konto invoice %1$s (%2$s).', 'woo-konto-checkout' ), $kind, $guid );
+	$number = ( $guid && empty( $args['draft'] ) ) ? konto_invoice_number( $gateway, $guid ) : '';
+	if ( $number ) {
+		$order->update_meta_data( 'konto_invoice_number', $number );
+	}
+	/* translators: 1: Konto invoice number (or id), 2: how the invoice was created (e.g. "issued as paid"). */
+	$note = sprintf( __( 'Konto invoice %1$s %2$s.', 'woo-konto-checkout' ), $number ? $number : $guid, $kind );
 	if ( 'Staðgreitt' === $data['customer']['name'] ) {
 		$note .= ' ' . __( 'No kennitala: cash sale (Staðgreitt) on the seller\'s kennitala.', 'woo-konto-checkout' );
 	}
@@ -1113,14 +1127,18 @@ function konto_create_credit_note( $order, $refund ) {
 
 	$guid = isset( $result['result'] ) ? (string) $result['result'] : 'created';
 	$refund->update_meta_data( '_konto_credit_note', $guid );
+	$number = konto_invoice_number( $gateway, $guid );
+	if ( $number ) {
+		$refund->update_meta_data( '_konto_credit_note_number', $number );
+	}
 	$refund->save_meta_data();
 
 	$note = sprintf(
-		/* translators: 1: refund id, 2: "full" or "partial", 3: credit note id. */
-		__( 'Refund #%1$d: Konto credit note created (%2$s, %3$s).', 'woo-konto-checkout' ),
+		/* translators: 1: refund id, 2: Konto credit note number (or id), 3: "full credit, invoice closed" or "partial". */
+		__( 'Refund #%1$d: Konto credit note %2$s created (%3$s).', 'woo-konto-checkout' ),
 		$refund->get_id(),
-		$full ? __( 'full credit, invoice closed', 'woo-konto-checkout' ) : __( 'partial', 'woo-konto-checkout' ),
-		$guid
+		$number ? $number : $guid,
+		$full ? __( 'full credit, invoice closed', 'woo-konto-checkout' ) : __( 'partial', 'woo-konto-checkout' )
 	);
 	if ( ! empty( $result['inventory'] ) && is_array( $result['inventory'] ) ) {
 		$parts = array();
@@ -1397,8 +1415,36 @@ function konto_maybe_auto_invoice( $order_id ) {
 	}
 }
 
+/** The Konto invoice (and any credit notes) at a glance on the order screen. */
+function konto_admin_order_panel( $order ) {
+	$invoice = $order->get_meta( 'konto_invoice' );
+	if ( ! $invoice ) {
+		return;
+	}
+	$number = $order->get_meta( 'konto_invoice_number' );
+	$label  = $number ? $number : $invoice;
+	if ( 'yes' === $order->get_meta( 'konto_invoice_draft' ) ) {
+		$label .= ' (' . __( 'draft', 'woo-konto-checkout' ) . ')';
+	}
+	$credits = array();
+	foreach ( $order->get_refunds() as $refund ) {
+		$credit = $refund->get_meta( '_konto_credit_note_number' );
+		if ( ! $credit ) {
+			$credit = $refund->get_meta( '_konto_credit_note' );
+		}
+		if ( $credit ) {
+			$credits[] = $credit;
+		}
+	}
+	echo '<p class="form-field form-field-wide"><strong>' . esc_html__( 'Konto invoice:', 'woo-konto-checkout' ) . '</strong> ' . esc_html( $label );
+	if ( $credits ) {
+		echo '<br><strong>' . esc_html__( 'Konto credit notes:', 'woo-konto-checkout' ) . '</strong> ' . esc_html( implode( ', ', $credits ) );
+	}
+	echo '</p>';
+}
+
 function konto_admin_head() {
-	echo '<style>.wc-action-button-konto::after{font-family:dashicons!important;content:"\f170"!important}.wc-action-button-konto_draft::after{font-family:dashicons!important;content:"\f137"!important}</style>';
+	echo '<style>.wc-action-button-konto::after{font-family:dashicons!important;content:"\f497"!important}.wc-action-button-konto_draft::after{font-family:dashicons!important;content:"\f464"!important}</style>';
 }
 
 /* -------------------------------------------------------------------------
