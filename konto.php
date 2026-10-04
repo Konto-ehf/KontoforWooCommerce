@@ -1,7 +1,7 @@
 <?php
 /*
   Plugin Name: Konto Checkout for WooCommerce
-  Plugin URI: http://wcplugin.konto.is/
+  Plugin URI: https://heim.konto.is/konto-fyrir-woocommerce/
   Description: Konto e-invoices and bank claims for WooCommerce orders, with stock sync from Konto inventory (lots).
   Text Domain: woo-konto-checkout
   Version: 2.1.0
@@ -20,6 +20,8 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+define( 'KONTO_GUIDE_URL', 'https://heim.konto.is/konto-fyrir-woocommerce/' );
 
 if ( ! defined( 'KONTO_VERSION' ) ) {
 	define( 'KONTO_VERSION', '2.1.0' );
@@ -361,7 +363,7 @@ function konto_define_classes() {
 
 		public function admin_options() {
 			echo '<h2>Konto</h2>';
-			echo '<p>' . esc_html__( 'Reikningar sendir frá Konto og krafa stofnuð í netbanka greiðanda.', 'woo-konto-checkout' ) . '</p>';
+			echo '<p>' . esc_html__( 'Reikningar sendir frá Konto og krafa stofnuð í netbanka greiðanda.', 'woo-konto-checkout' ) . ' <a href="' . esc_url( KONTO_GUIDE_URL ) . '" target="_blank" rel="noopener">' . esc_html__( 'Setup guide (heim.konto.is)', 'woo-konto-checkout' ) . '</a></p>';
 			if ( ! in_array( get_woocommerce_currency(), $this->currencies, true ) ) {
 				/* translators: %s: comma-separated list of currency codes. */
 				echo '<div class="inline error"><p><strong>' . esc_html__( 'Gateway disabled', 'woo-konto-checkout' ) . '</strong>: ' . esc_html( sprintf( __( 'The store currency is not supported by Konto. Use one of: %s.', 'woo-konto-checkout' ), implode( ', ', $this->currencies ) ) ) . '</p></div>';
@@ -400,13 +402,13 @@ function konto_define_classes() {
 				'username'       => array(
 					'title'       => __( 'Username', 'woo-konto-checkout' ),
 					'type'        => 'text',
-					'description' => __( 'Konto: Vefþjónustuaðgangur under Áskriftir og viðbætur.', 'woo-konto-checkout' ),
+					'description' => __( 'In Konto: Stillingar → API Access & Web Services (Vefþjónusta).', 'woo-konto-checkout' ),
 					'default'     => '',
 				),
 				'api_key'        => array(
 					'title'       => __( 'API key', 'woo-konto-checkout' ),
 					'type'        => 'password',
-					'description' => __( 'Konto: Vefþjónustuaðgangur under Áskriftir og viðbætur.', 'woo-konto-checkout' ),
+					'description' => __( 'In Konto: Stillingar → API Access & Web Services (Vefþjónusta).', 'woo-konto-checkout' ),
 					'default'     => '',
 				),
 				'invoicing'      => array(

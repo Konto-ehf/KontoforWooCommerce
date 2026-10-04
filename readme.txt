@@ -49,22 +49,32 @@ VAT is read from each order line: 24%, 11% or 0%. Shipping and fees keep their o
 
 = What you need =
 
-* A Konto subscription with API access (Vefþjónustuaðgangur), which gives you a username and an API key.
+* A Konto plan with API access (the "API Access & Web Services" add-on, Vefþjónusta), which gives you a username and an API key.
 * For stock sync: the Konto Inventory add-on.
+
+= Step-by-step guides =
+
+Guides with screenshots and video, in Icelandic, English and Polish:
+
+* [Set up Konto for WooCommerce](https://heim.konto.is/konto-fyrir-woocommerce/)
+* [Stock sync from Konto](https://heim.konto.is/konto-woocommerce-lagerstada/)
+* [Refunds become credit notes](https://heim.konto.is/konto-woocommerce-endurgreidslur-kreditreikningar/)
 
 = Á íslensku =
 
 Konto Checkout tengir WooCommerce-vefverslunina þína við Konto. Viðskiptavinir geta greitt með rafrænum reikningi og kröfu í netbanka. Pantanir fá rafrænan reikning úr Konto og lagerstaða verslunarinnar fylgir lagerstöðu í Konto, svo þú seljir aldrei það sem ekki er til. Endurgreiðslur verða sjálfkrafa að kreditreikningum.
 
-Áskrifendur á konto.is virkja vefþjónustuaðgang og sækja API-lykil undir Áskriftir og viðbætur.
+Þú finnur notandanafn og API-lykil í Konto undir Stillingar > API Access & Web Services (Vefþjónusta). Á heim.konto.is má finna leiðbeiningar með skjámyndum og myndbandi um [uppsetningu](https://heim.konto.is/konto-fyrir-woocommerce/), [samstillingu lagerstöðu](https://heim.konto.is/konto-woocommerce-lagerstada/) og [kreditreikninga vegna endurgreiðslna](https://heim.konto.is/konto-woocommerce-endurgreidslur-kreditreikningar/).
 
 == Installation ==
 
 1. Install "Konto Checkout for WooCommerce" from Plugins > Add New, and activate it.
 2. Go to WooCommerce > Settings > Payments > Konto.
-3. Enter your Konto username and API key (Vefþjónustuaðgangur under Áskriftir og viðbætur on konto.is) and save. The page confirms the connection and shows your Konto account.
+3. Enter your Konto username and API key and save. In Konto you find them under Stillingar > API Access & Web Services (Vefþjónusta). The page confirms the connection and shows your Konto account.
 4. Optional: turn on "Stock sync", and give each product the same SKU as its item number in Konto.
 5. Optional: turn on automatic invoices for orders paid by other methods.
+
+The full walkthrough, with screenshots and video: [Set up Konto for WooCommerce](https://heim.konto.is/konto-fyrir-woocommerce/).
 
 == Frequently Asked Questions ==
 
@@ -119,6 +129,7 @@ Yes. Test mode sends requests to the test server set under Advanced in the plugi
 * New: optional automatic invoices for orders paid by other methods.
 * New: "Konto: issue invoice" and "Konto: save as draft" on the order screen.
 * New: due days, final due days and invoice language settings.
+* New: step-by-step guides on heim.konto.is, linked from the settings page.
 * Changed: kennitala is required only when paying with Konto, and its check digit is validated.
 * Changed: without a kennitala the invoice is a cash sale (Staðgreitt) on the shop's kennitala.
 * Changed: VAT comes from the order's tax lines. Shipping keeps its VAT, fees get their own lines, and a rounding line absorbs differences of up to 1 kr.
