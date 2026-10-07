@@ -20,6 +20,8 @@ Sell the way Iceland pays. Konto Checkout connects your WooCommerce store to [Ko
 
 Customers choose "Reikningur í netbanka" at checkout and enter their kennitala. Konto issues the invoice, emails the PDF (or sends an XML e-invoice to companies) and creates a claim that shows up in the customer's online bank under "Ógreiddir reikningar". The kennitala is checked before the order goes through.
 
+The order waits as On hold, and when the claim is paid (or you mark the invoice paid in Konto) the plugin marks the order paid and moves it to Processing by itself, with the payment date and the invoice number on the order. Konto is checked every 15 minutes, or right away with "Konto: check payment status" on the order.
+
 = An invoice for every order =
 
 Orders paid by card or any other method can go to Konto too: one click in the order list, or automatically when the order is Processing. No kennitala? The invoice becomes a cash sale (Staðgreitt) on your own kennitala, and the customer still gets the receipt by email.
@@ -96,7 +98,11 @@ Konto. Add or remove stock in Konto (as lots), not in WooCommerce. The next sync
 
 = What about a partial refund of an unpaid bank claim? =
 
-A credit note can't shrink a claim that is still open, so the plugin doesn't create one. The order note tells you to adjust or cancel the claim in Konto. Once the invoice is paid, "Konto: create credit notes for refunds" on the order screen creates the missing credit notes.
+A credit note can't shrink a claim that is still open, so the plugin doesn't create one right away. The order note tells you so. As soon as Konto reports the invoice paid, the plugin creates the missing credit notes by itself (or use "Konto: create credit notes for refunds" on the order screen).
+
+= When is a Konto order marked paid? =
+
+When the bank claim is paid, or when you mark the invoice paid in Konto. The plugin checks Konto every 15 minutes and moves the order from On hold to Processing, with the payment date and the invoice number as the transaction ID. If the invoice or claim is cancelled in Konto, the order gets a note and is left for you to adjust. Shops that ship before payment can turn on "Mark as Processing right away"; the payment is then only noted on the order.
 
 = Which VAT rates are supported? =
 
@@ -128,12 +134,13 @@ Yes. Test mode sends requests to the test server set under Advanced in the plugi
 * New: the Konto invoice and credit note numbers are shown on the order screen and in order notes.
 * New: optional automatic invoices for orders paid by other methods.
 * New: "Konto: issue invoice" and "Konto: save as draft" on the order screen.
+* New: Konto orders are marked paid automatically when the claim is paid in Konto (checked every 15 minutes, or with "Konto: check payment status"). A cancelled invoice or claim adds an order note.
+* Changed: a Konto checkout waits as On hold (stock reserved) until it is paid, instead of Pending payment. "Mark as Processing right away" is off by default for new installs; shops that had it on keep it.
 * New: due days, final due days and invoice language settings.
 * New: step-by-step guides on heim.konto.is, linked from the settings page.
 * Changed: kennitala is required only when paying with Konto, and its check digit is validated.
 * Changed: without a kennitala the invoice is a cash sale (Staðgreitt) on the shop's kennitala.
 * Changed: VAT comes from the order's tax lines. Shipping keeps its VAT, fees get their own lines, and a rounding line absorbs differences of up to 1 kr.
-* Changed: a Konto checkout that waits for payment is On hold (stock reserved) instead of Pending payment.
 * Fix: the classic checkout rejected every order where a kennitala was entered.
 * Security: invoice buttons check a nonce and the user's permission. Requests verify the SSL certificate. The API key is never logged, and the settings field hides it.
 
@@ -143,4 +150,4 @@ Yes. Test mode sends requests to the test server set under Advanced in the plugi
 == Upgrade Notice ==
 
 = 2.1.0 =
-Fixes the classic checkout rejecting orders with a kennitala, and fixes a permission check on the invoice buttons. Adds stock sync from Konto inventory, credit notes for refunds and block checkout support.
+Fixes the classic checkout rejecting orders with a kennitala, and fixes a permission check on the invoice buttons. Adds stock sync from Konto inventory, credit notes for refunds, automatic payment status from Konto and block checkout support.

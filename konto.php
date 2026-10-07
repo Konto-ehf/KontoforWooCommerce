@@ -44,6 +44,7 @@ register_deactivation_hook( __FILE__, 'konto_on_deactivate' );
 function konto_on_deactivate() {
 	wp_clear_scheduled_hook( 'konto_inventory_sync' );
 	wp_clear_scheduled_hook( 'konto_inventory_sync_soon' );
+	wp_clear_scheduled_hook( 'konto_payment_sync' );
 }
 
 add_filter( 'cron_schedules', 'konto_cron_schedules' );
@@ -160,6 +161,7 @@ function konto_gateway_init() {
 	add_action( 'woocommerce_order_action_konto_create_invoice', 'konto_order_screen_create_invoice' );
 	add_action( 'woocommerce_order_action_konto_create_draft', 'konto_order_screen_create_draft' );
 	add_action( 'woocommerce_order_action_konto_credit_refunds', 'konto_order_screen_credit_refunds' );
+	add_action( 'woocommerce_order_action_konto_check_payment', 'konto_order_screen_check_payment' );
 
 	// Refunds -> Konto credit notes.
 	add_action( 'woocommerce_create_refund', 'konto_capture_refund_restock', 10, 2 );
@@ -176,6 +178,7 @@ function konto_gateway_init() {
 	// Inventory sync.
 	add_action( 'konto_inventory_sync', 'konto_inventory_sync_cron' );
 	add_action( 'konto_inventory_sync_soon', 'konto_inventory_sync_cron' );
+	add_action( 'konto_payment_sync', 'konto_payment_sync_cron' );
 	add_action( 'admin_init', 'konto_ensure_sync_schedule' );
 }
 
@@ -376,6 +379,7 @@ function konto_define_classes() {
 			echo '<table class="form-table">';
 			$this->generate_settings_html();
 			echo '</table>';
+			konto_render_payment_status();
 			konto_render_sync_status();
 		}
 
@@ -439,10 +443,10 @@ function konto_define_classes() {
 				),
 				'mark'           => array(
 					'title'       => __( 'Order status after a Konto checkout', 'woo-konto-checkout' ),
-					'label'       => __( 'Mark as Processing', 'woo-konto-checkout' ),
+					'label'       => __( 'Mark as Processing right away, before the customer has paid', 'woo-konto-checkout' ),
 					'type'        => 'checkbox',
-					'description' => __( 'On: the order goes to Processing once the claim is created. Off: it waits as On hold until you confirm payment. Stock is reserved either way.', 'woo-konto-checkout' ),
-					'default'     => 'yes',
+					'description' => __( 'Off (recommended): the order waits as On hold and is marked paid (Processing) by itself when the invoice or claim is paid in Konto, checked every 15 minutes. On: the order goes to Processing at once and the payment is only noted on the order. Stock is reserved either way.', 'woo-konto-checkout' ),
+					'default'     => 'no',
 				),
 				'auto_invoice'   => array(
 					'title'       => __( 'Other payment methods', 'woo-konto-checkout' ),
@@ -515,8 +519,9 @@ function konto_define_classes() {
 				}
 			}
 
-			// Both statuses hold stock; Processing = trusted, On hold = wait for payment.
-			if ( 'yes' === $this->get_option( 'mark', 'yes' ) ) {
+			// Both statuses hold stock; On hold = wait for Konto to report the payment
+			// (konto_payment_sync), Processing = the shop ships before payment.
+			if ( 'yes' === $this->get_option( 'mark', 'no' ) ) {
 				$order->update_status( 'processing', __( 'Konto claim created.', 'woo-konto-checkout' ) );
 			} else {
 				$order->update_status( 'on-hold', __( 'Konto claim created, awaiting payment.', 'woo-konto-checkout' ) );
@@ -1385,6 +1390,9 @@ function konto_order_screen_actions( $actions, $order = null ) {
 	if ( $order && $order->get_meta( 'konto_invoice' ) && konto_refunds_without_credit_note( $order ) ) {
 		$actions['konto_credit_refunds'] = __( 'Konto: create credit notes for refunds', 'woo-konto-checkout' );
 	}
+	if ( $order && konto_order_awaits_payment( $order ) ) {
+		$actions['konto_check_payment'] = __( 'Konto: check payment status', 'woo-konto-checkout' );
+	}
 	return $actions;
 }
 
@@ -1450,6 +1458,208 @@ function konto_admin_head() {
 }
 
 /* -------------------------------------------------------------------------
+ * Payment sync (Konto -> WooCommerce): a Konto-paid order is marked paid.
+ * Konto has no callbacks, so open Konto orders are checked with get-invoice
+ * every 15 minutes, least recently checked first.
+ * ---------------------------------------------------------------------- */
+
+function konto_schedule_payment_sync( $gateway ) {
+	$on   = 'yes' === $gateway->get_option( 'enabled', 'no' )
+		&& '' !== trim( (string) $gateway->get_option( 'username' ) )
+		&& '' !== trim( (string) $gateway->get_option( 'api_key' ) );
+	$next = wp_next_scheduled( 'konto_payment_sync' );
+	if ( $on && ! $next ) {
+		wp_schedule_event( time() + 2 * MINUTE_IN_SECONDS, 'konto_15min', 'konto_payment_sync' );
+	} elseif ( ! $on && $next ) {
+		wp_clear_scheduled_hook( 'konto_payment_sync' );
+	}
+}
+
+function konto_payment_sync_cron() {
+	konto_payment_sync();
+}
+
+/**
+ * True for a Konto checkout whose bank claim has not been reported paid (or
+ * cancelled) yet: On hold, or Processing when the shop marks orders Processing
+ * at once. Drafts and orders paid by other methods are never checked.
+ */
+function konto_order_awaits_payment( $order ) {
+	if ( ! $order || $order instanceof WC_Order_Refund || 'konto' !== $order->get_payment_method() ) {
+		return false;
+	}
+	if ( ! $order->get_meta( 'konto_invoice' ) || 'yes' === $order->get_meta( 'konto_invoice_draft' ) ) {
+		return false;
+	}
+	if ( in_array( $order->get_meta( '_konto_payment_state' ), array( 'paid', 'cancelled' ), true ) ) {
+		return false;
+	}
+	return $order->has_status( array( 'on-hold', 'processing' ) );
+}
+
+/**
+ * Asks Konto about one order and acts on the answer.
+ *
+ * @return string|WP_Error paid|cancelled|collection|open
+ */
+function konto_check_order_payment( $order, $gateway ) {
+	$result = $gateway->api()->call( 'get-invoice', array( 'guid' => $order->get_meta( 'konto_invoice' ) ) );
+	$order->update_meta_data( '_konto_payment_checked', time() );
+	if ( is_wp_error( $result ) || empty( $result['result'] ) || ! is_array( $result['result'] ) ) {
+		$order->save_meta_data();
+		return is_wp_error( $result ) ? $result : new WP_Error( 'konto_payment', __( 'Konto did not return the invoice.', 'woo-konto-checkout' ) );
+	}
+	$invoice = $result['result'];
+	$status  = isset( $invoice['status'] ) ? (string) $invoice['status'] : '';
+	$claim   = isset( $invoice['claim_status'] ) ? (string) $invoice['claim_status'] : '';
+	$number  = ! empty( $invoice['number'] ) ? (string) $invoice['number'] : (string) $order->get_meta( 'konto_invoice_number' );
+
+	if ( 'Paid' === $status || 'paid' === $claim ) {
+		// Konto gives the day only: paid today = now, an earlier day = that day.
+		$day  = ! empty( $invoice['paid_date'] ) ? (string) $invoice['paid_date'] : '';
+		$paid = ( '' === $day || wp_date( 'Y-m-d' ) === $day ) ? false : strtotime( $day . ' 00:00:00 ' . wp_timezone_string() );
+		$paid = ( $paid && $paid <= time() ) ? $paid : time();
+		$order->update_meta_data( '_konto_payment_state', 'paid' );
+		if ( $order->has_status( 'on-hold' ) ) {
+			/* translators: 1: Konto invoice number, 2: payment date. */
+			$order->add_order_note( sprintf( __( 'Konto: invoice %1$s was paid (%2$s). The order is marked as paid.', 'woo-konto-checkout' ), $number, wp_date( 'Y-m-d', $paid ) ) );
+			$order->save();
+			$order->payment_complete( $number ); // On hold -> Processing (or Completed), sends the usual emails.
+		} else {
+			/* translators: 1: Konto invoice number, 2: payment date. */
+			$order->add_order_note( sprintf( __( 'Konto: invoice %1$s was paid (%2$s).', 'woo-konto-checkout' ), $number, wp_date( 'Y-m-d', $paid ) ) );
+			if ( ! $order->get_transaction_id() ) {
+				$order->set_transaction_id( $number );
+			}
+		}
+		$order->set_date_paid( $paid );
+		$order->save();
+		// Partial refunds of an unpaid claim waited for this: create their credit notes now.
+		if ( 'yes' === $gateway->get_option( 'credit_notes', 'yes' ) ) {
+			foreach ( array_reverse( konto_refunds_without_credit_note( $order ) ) as $refund ) {
+				if ( is_wp_error( konto_create_credit_note( $order, $refund ) ) ) {
+					break;
+				}
+			}
+		}
+		return 'paid';
+	}
+
+	if ( 'Cancelled' === $status || 'cancel' === $claim ) {
+		$order->update_meta_data( '_konto_payment_state', 'cancelled' );
+		/* translators: %s: Konto invoice number. */
+		$order->add_order_note( sprintf( __( 'Konto: invoice %s or its bank claim was cancelled in Konto. The order has not been changed; adjust it here if needed.', 'woo-konto-checkout' ), $number ) );
+		$order->save();
+		return 'cancelled';
+	}
+
+	if ( 'Collection' === $status ) {
+		if ( 'yes' !== $order->get_meta( '_konto_collection_noted' ) ) {
+			$order->update_meta_data( '_konto_collection_noted', 'yes' );
+			/* translators: %s: Konto invoice number. */
+			$order->add_order_note( sprintf( __( 'Konto: invoice %s is unpaid and has gone to collection. The order is marked as paid when it is paid in Konto.', 'woo-konto-checkout' ), $number ) );
+		}
+		$order->save_meta_data();
+		return 'collection';
+	}
+
+	$order->save_meta_data();
+	return 'open';
+}
+
+/**
+ * Checks up to $limit open Konto orders, least recently checked first.
+ *
+ * @return array report
+ */
+function konto_payment_sync( $limit = 50 ) {
+	$report  = array(
+		'time'      => time(),
+		'checked'   => 0,
+		'paid'      => 0,
+		'cancelled' => 0,
+		'open'      => 0,
+		'error'     => '',
+	);
+	$gateway = konto_gateway();
+	if ( ! $gateway || get_transient( 'konto_payment_lock' ) ) {
+		return $report;
+	}
+	set_transient( 'konto_payment_lock', 1, 5 * MINUTE_IN_SECONDS );
+	try {
+		$days   = (int) apply_filters( 'konto_payment_sync_days', 120 );
+		$ids    = wc_get_orders(
+			array(
+				'type'           => 'shop_order',
+				'status'         => array( 'wc-on-hold', 'wc-processing' ),
+				'payment_method' => 'konto',
+				'date_created'   => '>' . ( time() - $days * DAY_IN_SECONDS ),
+				'limit'          => -1,
+				'return'         => 'ids',
+			)
+		);
+		$queue  = array();
+		foreach ( $ids as $id ) {
+			$order = wc_get_order( $id );
+			if ( konto_order_awaits_payment( $order ) ) {
+				$queue[ $id ] = (int) $order->get_meta( '_konto_payment_checked' );
+			}
+		}
+		asort( $queue );
+		$report['open'] = count( $queue );
+		$failures       = 0;
+		foreach ( array_slice( array_keys( $queue ), 0, (int) apply_filters( 'konto_payment_sync_batch', $limit ) ) as $id ) {
+			$state = konto_check_order_payment( wc_get_order( $id ), $gateway );
+			$report['checked']++;
+			if ( is_wp_error( $state ) ) {
+				$report['error'] = $state->get_error_message();
+				if ( ++$failures >= 3 ) {
+					break; // Konto unreachable: try again next run.
+				}
+				continue;
+			}
+			if ( 'paid' === $state || 'cancelled' === $state ) {
+				$report[ $state ]++;
+				$report['open']--;
+			}
+		}
+	} catch ( Throwable $e ) {
+		$report['error'] = $e->getMessage();
+		Konto_Gateway_WC::log( 'Payment sync failed: ' . $e->getMessage(), 'error' );
+	}
+	delete_transient( 'konto_payment_lock' );
+	update_option( 'konto_payment_last_sync', $report, false );
+	return $report;
+}
+
+function konto_order_screen_check_payment( $order ) {
+	$gateway = konto_gateway();
+	if ( ! $gateway || ! current_user_can( 'edit_shop_orders' ) || ! konto_order_awaits_payment( $order ) ) {
+		return;
+	}
+	$state = konto_check_order_payment( $order, $gateway );
+	if ( is_wp_error( $state ) ) {
+		konto_add_notice( $state->get_error_message() );
+	} elseif ( 'open' === $state ) {
+		konto_add_notice( __( 'Konto: the invoice has not been paid yet.', 'woo-konto-checkout' ), 'success' );
+	}
+}
+
+function konto_render_payment_status() {
+	$report = get_option( 'konto_payment_last_sync', array() );
+	echo '<h3>' . esc_html__( 'Payment check', 'woo-konto-checkout' ) . '</h3>';
+	if ( ! $report ) {
+		echo '<p>' . esc_html__( 'Every 15 minutes the plugin asks Konto about Konto orders that are not paid yet and marks them paid when the invoice or claim is paid. No check has run yet.', 'woo-konto-checkout' ) . '</p>';
+		return;
+	}
+	/* translators: 1: date and time, 2: orders checked, 3: orders marked paid, 4: orders still waiting for payment. */
+	echo '<p>' . esc_html( sprintf( __( 'Last check: %1$s. Checked %2$d, marked paid %3$d, still waiting for payment %4$d.', 'woo-konto-checkout' ), wp_date( 'Y-m-d H:i', $report['time'] ), $report['checked'], $report['paid'], $report['open'] ) ) . '</p>';
+	if ( ! empty( $report['error'] ) ) {
+		echo '<p style="color:#b32d2e">' . esc_html( $report['error'] ) . '</p>';
+	}
+}
+
+/* -------------------------------------------------------------------------
  * Inventory sync (Konto -> WooCommerce).
  * ---------------------------------------------------------------------- */
 
@@ -1466,6 +1676,7 @@ function konto_ensure_sync_schedule() {
 	$gateway = konto_gateway();
 	if ( $gateway ) {
 		konto_schedule_sync( $gateway->inventory_enabled() );
+		konto_schedule_payment_sync( $gateway );
 	}
 }
 
