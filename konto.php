@@ -4,7 +4,7 @@
   Plugin URI: https://heim.konto.is/konto-fyrir-woocommerce/
   Description: Konto e-invoices and bank claims for WooCommerce orders, with stock sync from Konto inventory (lots).
   Text Domain: woo-konto-checkout
-  Version: 2.1.0
+  Version: 2.1.1
   Author: Konto
   Author URI: https://konto.is/
   License: GPLv3
@@ -14,7 +14,7 @@
   Requires PHP: 7.4
   Requires Plugins: woocommerce
   WC requires at least: 7.0
-  WC tested up to: 11.1
+  WC tested up to: 11.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'KONTO_GUIDE_URL', 'https://heim.konto.is/konto-fyrir-woocommerce/' );
 
 if ( ! defined( 'KONTO_VERSION' ) ) {
-	define( 'KONTO_VERSION', '2.1.0' );
+	define( 'KONTO_VERSION', '2.1.1' );
 	define( 'KONTO_FILE', __FILE__ );
 	define( 'KONTO_DIR', plugin_dir_path( __FILE__ ) );
 	define( 'KONTO_URL', plugin_dir_url( __FILE__ ) );

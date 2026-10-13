@@ -4,7 +4,7 @@ Tags: invoice, iceland, e-invoice, inventory, payment gateway
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 Repo: https://github.com/Konto-ehf/KontoforWooCommerce
@@ -124,6 +124,9 @@ Yes. Test mode sends requests to the test server set under Advanced in the plugi
 
 == Changelog ==
 
+= 2.1.1 =
+* Tested with WooCommerce 11.2. No functional changes.
+
 = 2.1.0 =
 * New: stock sync from Konto inventory (lots), matched on SKU, every 15 minutes or on demand.
 * New: invoices draw Konto lots down, earliest expiry first. The order note lists the lots used.
@@ -148,6 +151,9 @@ Yes. Test mode sends requests to the test server set under Advanced in the plugi
 * Previous release.
 
 == Upgrade Notice ==
+
+= 2.1.1 =
+Tested with WooCommerce 11.2. No functional changes.
 
 = 2.1.0 =
 Fixes the classic checkout rejecting orders with a kennitala, and fixes a permission check on the invoice buttons. Adds stock sync from Konto inventory, credit notes for refunds, automatic payment status from Konto and block checkout support.
